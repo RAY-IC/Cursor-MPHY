@@ -22,7 +22,7 @@ module cdc_manager (
 );
 
 //=============================================================================
-// Synchronize Configuration Signals (APB ? M-PHY Clock Domain)
+// Synchronize Configuration Signals (APB to M-PHY Clock Domain)
 //=============================================================================
 reg cfg_enable_sync1, cfg_enable_sync2;
 reg cfg_mode_sel_sync1, cfg_mode_sel_sync2;
@@ -52,7 +52,7 @@ assign cfg_mode_sel_sync = cfg_mode_sel_sync2;
 assign cfg_hs_gear_sync = cfg_hs_gear_sync2;
 
 //=============================================================================
-// Synchronize Status Signals (M-PHY Clock Domain ? APB Domain)
+// Synchronize Status Signals (M-PHY Clock Domain to APB Domain)
 //=============================================================================
 // Note: This requires APB clock, which should be passed as parameter
 // For now, using handshake approach

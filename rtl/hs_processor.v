@@ -84,7 +84,7 @@ always @(posedge hs_ref_clk or negedge rstn) begin
 end
 
 //=============================================================================
-// TX Data Path: 32bit ? 16bit
+// TX Data Path: 32bit to 16bit conversion
 //=============================================================================
 reg [31:0] tx_data_buffer;
 reg [1:0]  tx_word_cnt;
@@ -122,7 +122,7 @@ assign hs_tx_start = (tx_word_cnt == 2'h0) && tx_burst_active;
 assign hs_tx_end = (tx_word_cnt == 2'h1) && tx_burst_active;
 
 //=============================================================================
-// RX Data Path: 16bit ? 32bit
+// RX Data Path: 16bit to 32bit conversion
 //=============================================================================
 reg [31:0] rx_data_buffer;
 reg [1:0]  rx_word_cnt;

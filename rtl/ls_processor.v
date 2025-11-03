@@ -42,7 +42,7 @@ module ls_processor (
 wire active_gear = ls_gear_a || ls_gear_b;
 
 //=============================================================================
-// TX Data Path: 32bit ? 8bit
+// TX Data Path: 32bit to 8bit conversion
 //=============================================================================
 reg [31:0] tx_data_buffer;
 reg [2:0]  tx_byte_cnt;
@@ -82,7 +82,7 @@ assign ls_tx_valid = tx_active && ls_tx_ready;
 assign ls_tx_start = (tx_byte_cnt == 3'h0) && tx_active;
 
 //=============================================================================
-// RX Data Path: 8bit ? 32bit
+// RX Data Path: 8bit to 32bit conversion
 //=============================================================================
 reg [31:0] rx_data_buffer;
 reg [2:0]  rx_byte_cnt;
