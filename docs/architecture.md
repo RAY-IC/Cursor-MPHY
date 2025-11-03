@@ -1,0 +1,164 @@
+# MIPI M-PHY Digital Architecture Design
+
+## 1. Overall Architecture
+
+### 1.1 System Overview
+MIPI M-PHY 5.0 digital section is responsible for processing protocol layer logic, interfacing with analog PHY, supporting high-speed mode (HS-GEAR-1 to HS-GEAR-5) and low-speed mode (LS-GEAR-A/B). The design uses RMMI (Reduced Media Independent Interface) as the primary data path interface for UniPro controller communication, and APB3.0 as configuration and debug interface.
+
+### 1.2 Module Hierarchy
+
+```
+???????????????????????????????????????????????????????????
+?                   M-PHY Digital Top                      ?
+???????????????????????????????????????????????????????????
+?                                                           ?
+?  ????????????    ????????????????    ????????????????  ?
+?  ? APB3.0   ?    ?   M-PHY      ?    ?  Clock &     ?  ?
+?  ? Config   ??????   State      ??????  Reset       ?  ?
+?  ? Module   ?    ?   Machine    ?    ?  Management  ?  ?
+?  ????????????    ????????????????    ????????????????  ?
+?       ?                  ?                    ?          ?
+?       ?                  ?                    ?          ?
+?       ?         ???????????????????           ?          ?
+?       ?         ?   HS Mode       ?           ?          ?
+?       ?         ?   Processor     ?           ?          ?
+?       ?         ?   (GEAR-1~5)    ?           ?          ?
+?       ?         ???????????????????           ?          ?
+?       ?                  ?                    ?          ?
+?       ?                  ?                    ?          ?
+?       ?         ???????????????????           ?          ?
+?       ?         ?   LS Mode       ?           ?          ?
+?       ?         ?   Processor     ?           ?          ?
+?       ?         ???????????????????           ?          ?
+?       ?                  ?                    ?          ?
+?       ?                  ?                    ?          ?
+?       ?         ???????????????????           ?          ?
+?       ?         ?   TX/RX Data    ?           ?          ?
+?       ?         ?   Path          ?           ?          ?
+?       ?         ???????????????????           ?          ?
+?       ?                  ?                    ?          ?
+?       ?                  ?                    ?          ?
+?       ???????????? ??????????????????? ????????          ?
+?                    ? RMMI Interface ?                   ?
+?                    ? (Data Path)    ?                   ?
+?                    ???????????????????                   ?
+?                           ?                              ?
+?                           ?                              ?
+?                    [UniPro Controller]                   ?
+?                                                           ?
+?                    ???????????????????                   ?
+?                    ? Analog PHY      ?                   ?
+?                    ? Interface       ?                   ?
+?                    ???????????????????                   ?
+?                           ?                              ?
+?                           ?                              ?
+?                    [Analog PHY]                          ?
+???????????????????????????????????????????????????????????
+```
+
+### 1.3 Main Module Description
+
+1. **APB3.0 Configuration Module** (apb_config.v)
+   - Configuration and debug interface (NOT data path)
+   - Receives APB configuration commands
+   - Manages all configuration registers
+   - Status register access
+   - Debug information access
+
+2. **M-PHY State Machine** (mphy_state_machine.v)
+   - Protocol state management (HIBERN8, SLEEP, STALL, HS-BURST, LS-BURST)
+   - Mode switching control (HS/LS mode)
+   - GEAR selection
+
+3. **RMMI Interface Module** (rmmi_interface.v)
+   - **PRIMARY DATA PATH** interface for UniPro controller
+   - TX data path: RMMI ? M-PHY digital ? Analog PHY
+   - RX data path: Analog PHY ? M-PHY digital ? RMMI
+   - Control and status signals
+   - Flow control
+
+4. **High-Speed Mode Processor** (hs_processor.v)
+   - Supports GEAR-1 to GEAR-5
+   - 16bit data width processing
+   - Clock recovery and synchronization
+   - Interfaces with analog PHY (16bit)
+
+5. **Low-Speed Mode Processor** (ls_processor.v)
+   - LS-GEAR-A/B support
+   - 8bit data width processing
+   - Low-speed clock domain management
+   - Interfaces with analog PHY (8bit)
+
+6. **TX Data Path** (tx_data_path.v)
+   - Data packing from RMMI format
+   - 8b/10b encoding (high-speed mode)
+   - Data alignment and output to analog PHY
+
+7. **RX Data Path** (rx_data_path.v)
+   - Data reception from analog PHY
+   - 8b/10b decoding (high-speed mode)
+   - Data unpacking to RMMI format
+
+8. **Clock Domain Cross Module** (cdc_manager.v)
+   - Multi-clock domain synchronization
+   - Async FIFO management
+   - Clock gating
+
+9. **Reserved Module Interfaces**
+   - Analog calibration interface reserved
+   - Channel processing algorithm interface reserved
+
+## 2. Clock and Reset Architecture
+
+### 2.1 Clock Domains
+- **PCLK**: APB configuration clock (for config/debug only)
+- **RMMI_CLK**: RMMI interface clock (main data path clock)
+- **HS_REF_CLK**: High-speed mode reference clock (provided by PLL)
+- **LS_CLK**: Low-speed mode clock
+- **TX_CLK/RX_CLK**: Transmit/Receive clock (from analog PHY)
+
+### 2.2 Reset Strategy
+- Global reset (rstn)
+- Module-level reset (controlled by configuration)
+- Separate reset domains for config and data paths
+
+## 3. Data Flow
+
+### 3.1 Primary Data Path (RMMI)
+
+**TX Path (UniPro Controller ? Analog PHY):**
+```
+UniPro Controller ? RMMI TX Interface ? TX Data Path ? HS/LS Processor ? Analog PHY
+```
+
+**RX Path (Analog PHY ? UniPro Controller):**
+```
+Analog PHY ? HS/LS Processor ? RX Data Path ? RMMI RX Interface ? UniPro Controller
+```
+
+### 3.2 Configuration/Debug Path (APB)
+```
+APB Master ? APB Config Module ? Configuration Registers
+                                ? Status Registers (read-only)
+                                ? Debug Registers
+```
+
+## 4. Interface Summary
+
+### 4.1 RMMI Interface (Primary Data Path)
+- **Purpose**: Main data communication with UniPro controller
+- **Direction**: Bidirectional (TX and RX paths)
+- **Data Width**: Variable based on mode and configuration
+- **Clock**: Independent RMMI clock domain
+
+### 4.2 APB Interface (Configuration/Debug)
+- **Purpose**: Configuration and debugging only
+- **Direction**: Bidirectional (register read/write)
+- **Data Width**: 32bit
+- **Clock**: Independent APB clock domain
+
+### 4.3 Analog PHY Interface
+- **Purpose**: Interface to analog PHY
+- **Direction**: Bidirectional (TX and RX)
+- **Data Width**: 16bit (HS) or 8bit (LS)
+- **Clock**: PHY clock domain
