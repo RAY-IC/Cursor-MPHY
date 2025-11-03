@@ -27,6 +27,7 @@ module apb_config (
     output reg         ls_gear_a,
     output reg         ls_gear_b,
     output reg  [31:0] interrupt_en,
+    output reg         link_enable,
     
     // Status Inputs
     input  wire        mphy_ready,
@@ -183,6 +184,7 @@ always @(posedge pclk or negedge presetn) begin
         ls_gear_a <= 1'b0;
         ls_gear_b <= 1'b0;
         interrupt_en <= 32'h0;
+        link_enable <= 1'b0;
         interrupt_clear <= 1'b0;
     end else begin
         // Control Register [0x00]
@@ -190,6 +192,7 @@ always @(posedge pclk or negedge presetn) begin
         tx_enable <= ctrl_reg[1];
         rx_enable <= ctrl_reg[2];
         soft_reset <= ctrl_reg[3];
+        link_enable <= ctrl_reg[4];
         
         // Mode Register [0x08]
         mode_sel <= mode_reg[0];

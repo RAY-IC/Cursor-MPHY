@@ -2,6 +2,8 @@
 // MIPI M-PHY Digital Top Module
 //=============================================================================
 // Description: Top-level integration of all M-PHY digital modules
+//              RMMI interface for primary data path
+//              APB interface for configuration and debug only
 //=============================================================================
 
 module mphy_digital_top (
@@ -9,7 +11,7 @@ module mphy_digital_top (
     input  wire        clk,
     input  wire        rstn,
     
-    // APB3.0 Configuration Interface
+    // APB3.0 Configuration Interface (Config/Debug ONLY)
     input  wire        pclk,
     input  wire        presetn,
     input  wire        psel,
@@ -20,6 +22,38 @@ module mphy_digital_top (
     output reg  [31:0] prdata,
     output reg         pready,
     output reg         pslverr,
+    
+    // RMMI Interface (PRIMARY DATA PATH)
+    // RMMI TX (UniPro ? M-PHY)
+    input  wire        rmmi_tx_clk,
+    input  wire        rmmi_tx_req,
+    output wire        rmmi_tx_ack,
+    input  wire [31:0] rmmi_tx_data,
+    input  wire        rmmi_tx_valid,
+    output wire        rmmi_tx_ready,
+    input  wire        rmmi_tx_sot,
+    input  wire        rmmi_tx_eot,
+    input  wire [1:0]  rmmi_tx_data_type,
+    
+    // RMMI RX (M-PHY ? UniPro)
+    input  wire        rmmi_rx_clk,
+    output wire        rmmi_rx_req,
+    input  wire        rmmi_rx_ack,
+    output wire [31:0] rmmi_rx_data,
+    output wire        rmmi_rx_valid,
+    input  wire        rmmi_rx_ready,
+    output wire        rmmi_rx_sot,
+    output wire        rmmi_rx_eot,
+    output wire [1:0]  rmmi_rx_data_type,
+    
+    // RMMI Control
+    input  wire        rmmi_rst_n,
+    output wire [2:0]  rmmi_link_state,
+    output wire        rmmi_link_active,
+    output wire        rmmi_tx_active,
+    output wire        rmmi_rx_active,
+    output wire        rmmi_error,
+    output wire [7:0]  rmmi_error_code,
     
     // Clock from Analog PHY PLL
     input  wire        hs_ref_clk,      // HS reference clock from PLL
@@ -73,15 +107,6 @@ module mphy_digital_top (
     input  wire [31:0] alg_result_data,
     input  wire        alg_result_valid,
     
-    // User Data Interface
-    input  wire [31:0] user_tx_data,
-    input  wire        user_tx_valid,
-    output wire        user_tx_ready,
-    
-    output wire [31:0] user_rx_data,
-    output wire        user_rx_valid,
-    input  wire        user_rx_ready,
-    
     // Interrupt
     output wire        interrupt
 );
@@ -100,6 +125,7 @@ wire        ls_gear_a;
 wire        ls_gear_b;
 wire [31:0] interrupt_en;
 wire        interrupt_clear;
+wire        link_enable;
 
 // Status Signals
 wire        mphy_ready;
@@ -110,7 +136,22 @@ wire        rx_fifo_empty;
 wire [2:0]  current_state;
 wire [31:0] interrupt_status;
 
-// TX/RX Data Path Signals
+// RMMI Internal Interface
+wire [31:0] rmmi_int_tx_data;
+wire        rmmi_int_tx_valid;
+wire        rmmi_int_tx_ready;
+wire        rmmi_int_tx_sot;
+wire        rmmi_int_tx_eot;
+wire [1:0]  rmmi_int_tx_data_type;
+
+wire [31:0] rmmi_int_rx_data;
+wire        rmmi_int_rx_valid;
+wire        rmmi_int_rx_ready;
+wire        rmmi_int_rx_sot;
+wire        rmmi_int_rx_eot;
+wire [1:0]  rmmi_int_rx_data_type;
+
+// TX/RX Data Path Signals (between RMMI and HS/LS processors)
 wire [31:0] tx_data_to_hs;
 wire        tx_valid_to_hs;
 wire        tx_ready_from_hs;
@@ -149,6 +190,7 @@ apb_config u_apb_config (
     .ls_gear_a(ls_gear_a),
     .ls_gear_b(ls_gear_b),
     .interrupt_en(interrupt_en),
+    .link_enable(link_enable),
     
     .mphy_ready(mphy_ready),
     .tx_ready(tx_ready),
@@ -192,7 +234,63 @@ mphy_state_machine u_mphy_state_machine (
 );
 
 //=============================================================================
-// TX Data Path
+// RMMI Interface Module (PRIMARY DATA PATH)
+//=============================================================================
+rmmi_interface u_rmmi_interface (
+    .clk(clk),
+    .rstn(rstn & !soft_reset),
+    
+    .rmmi_tx_clk(rmmi_tx_clk),
+    .rmmi_tx_req(rmmi_tx_req),
+    .rmmi_tx_ack(rmmi_tx_ack),
+    .rmmi_tx_data(rmmi_tx_data),
+    .rmmi_tx_valid(rmmi_tx_valid),
+    .rmmi_tx_ready(rmmi_tx_ready),
+    .rmmi_tx_sot(rmmi_tx_sot),
+    .rmmi_tx_eot(rmmi_tx_eot),
+    .rmmi_tx_data_type(rmmi_tx_data_type),
+    
+    .rmmi_rx_clk(rmmi_rx_clk),
+    .rmmi_rx_req(rmmi_rx_req),
+    .rmmi_rx_ack(rmmi_rx_ack),
+    .rmmi_rx_data(rmmi_rx_data),
+    .rmmi_rx_valid(rmmi_rx_valid),
+    .rmmi_rx_ready(rmmi_rx_ready),
+    .rmmi_rx_sot(rmmi_rx_sot),
+    .rmmi_rx_eot(rmmi_rx_eot),
+    .rmmi_rx_data_type(rmmi_rx_data_type),
+    
+    .rmmi_rst_n(rmmi_rst_n),
+    .rmmi_link_state(rmmi_link_state),
+    .rmmi_link_active(rmmi_link_active),
+    .rmmi_tx_active(rmmi_tx_active),
+    .rmmi_rx_active(rmmi_rx_active),
+    .rmmi_error(rmmi_error),
+    .rmmi_error_code(rmmi_error_code),
+    
+    .int_tx_data(rmmi_int_tx_data),
+    .int_tx_valid(rmmi_int_tx_valid),
+    .int_tx_ready(rmmi_int_tx_ready),
+    .int_tx_sot(rmmi_int_tx_sot),
+    .int_tx_eot(rmmi_int_tx_eot),
+    .int_tx_data_type(rmmi_int_tx_data_type),
+    
+    .int_rx_data(rmmi_int_rx_data),
+    .int_rx_valid(rmmi_int_rx_valid),
+    .int_rx_ready(rmmi_int_rx_ready),
+    .int_rx_sot(rmmi_int_rx_sot),
+    .int_rx_eot(rmmi_int_rx_eot),
+    .int_rx_data_type(rmmi_int_rx_data_type),
+    
+    .mphy_ready(mphy_ready),
+    .tx_enable(tx_enable),
+    .rx_enable(rx_enable),
+    .mphy_state(current_state),
+    .link_enable(link_enable)
+);
+
+//=============================================================================
+// TX Data Path (RMMI ? HS/LS Processor)
 //=============================================================================
 tx_data_path u_tx_data_path (
     .clk(clk),
@@ -202,9 +300,12 @@ tx_data_path u_tx_data_path (
     .hs_mode(mphy_hs_mode),
     .ls_mode(mphy_ls_mode),
     
-    .user_tx_data(user_tx_data),
-    .user_tx_valid(user_tx_valid),
-    .user_tx_ready(user_tx_ready),
+    // RMMI Internal Interface
+    .rmmi_tx_data(rmmi_int_tx_data),
+    .rmmi_tx_valid(rmmi_int_tx_valid),
+    .rmmi_tx_ready(rmmi_int_tx_ready),
+    .rmmi_tx_sot(rmmi_int_tx_sot),
+    .rmmi_tx_eot(rmmi_int_tx_eot),
     
     .hs_tx_data(tx_data_to_hs),
     .hs_tx_valid(tx_valid_to_hs),
@@ -219,7 +320,7 @@ tx_data_path u_tx_data_path (
 );
 
 //=============================================================================
-// RX Data Path
+// RX Data Path (HS/LS Processor ? RMMI)
 //=============================================================================
 rx_data_path u_rx_data_path (
     .clk(clk),
@@ -237,9 +338,12 @@ rx_data_path u_rx_data_path (
     .ls_rx_valid(rx_valid_from_ls),
     .ls_rx_ready(rx_ready_to_ls),
     
-    .user_rx_data(user_rx_data),
-    .user_rx_valid(user_rx_valid),
-    .user_rx_ready(user_rx_ready),
+    // RMMI Internal Interface
+    .rmmi_rx_data(rmmi_int_rx_data),
+    .rmmi_rx_valid(rmmi_int_rx_valid),
+    .rmmi_rx_ready(rmmi_int_rx_ready),
+    .rmmi_rx_sot(rmmi_int_rx_sot),
+    .rmmi_rx_eot(rmmi_int_rx_eot),
     
     .rx_fifo_full(),
     .rx_fifo_empty(rx_fifo_empty)

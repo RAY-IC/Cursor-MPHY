@@ -2,6 +2,7 @@
 # File list for RTL compilation
 
 rtl/apb_config.v
+rtl/rmmi_interface.v
 rtl/mphy_state_machine.v
 rtl/hs_processor.v
 rtl/ls_processor.v
