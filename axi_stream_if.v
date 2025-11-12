@@ -30,6 +30,9 @@ module axi_stream_if (
     output reg         hash_ready,
     input wire [1:0]   hash_size,  // 00: 128bit(MD5), 01: 256bit(SHA256), 10: 160bit(SHA1)
     
+    // Internal ready signal
+    wire hash_result_ready_internal;
+    
     // Control
     input wire [1:0]   algorithm_sel,
     output reg         ready
@@ -87,6 +90,9 @@ module axi_stream_if (
     
     assign block_data = full_block;
     
+    assign hash_result_ready_internal = (output_state == 2'b00) && !m_axis_tvalid;
+    assign hash_ready = hash_result_ready_internal;
+    
     // Output state machine
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -95,36 +101,30 @@ module axi_stream_if (
             m_axis_tlast <= 1'b0;
             output_buffer <= 256'b0;
             output_state <= 2'b0;
-            hash_ready <= 1'b0;
         end else begin
             case (output_state)
                 2'b00: begin  // Idle
-                    if (hash_valid) begin
-                        hash_ready <= 1'b1;
+                    if (hash_valid && hash_result_ready_internal) begin
                         case (hash_size)
                             2'b00: begin  // MD5: 128bit
                                 m_axis_tdata <= {128'b0, hash_result[127:0]};
                                 m_axis_tvalid <= 1'b1;
                                 m_axis_tlast <= 1'b1;
-                                output_state <= 2'b00;
                             end
                             2'b01: begin  // SHA256: 256bit
                                 m_axis_tdata <= hash_result;
                                 m_axis_tvalid <= 1'b1;
                                 m_axis_tlast <= 1'b1;
-                                output_state <= 2'b00;
                             end
                             2'b10: begin  // SHA1: 160bit
                                 m_axis_tdata <= {96'b0, hash_result[159:0]};
                                 m_axis_tvalid <= 1'b1;
                                 m_axis_tlast <= 1'b1;
-                                output_state <= 2'b00;
                             end
                             default: begin
                                 m_axis_tdata <= hash_result;
                                 m_axis_tvalid <= 1'b1;
                                 m_axis_tlast <= 1'b1;
-                                output_state <= 2'b00;
                             end
                         endcase
                     end
@@ -138,10 +138,6 @@ module axi_stream_if (
             if (m_axis_tvalid && m_axis_tready) begin
                 m_axis_tvalid <= 1'b0;
                 m_axis_tlast <= 1'b0;
-                hash_ready <= 1'b0;
-                if (output_state != 2'b00) begin
-                    output_state <= 2'b00;
-                end
             end
         end
     end
