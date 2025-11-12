@@ -112,17 +112,25 @@ vsim -c tb_hash_top_multi -do "run -all"
 - 共享常数表
 - Pipeline间资源共享
 
-## 资源估算
+## 资源估算（全部换算为LUT）
 
-### 单Pipeline资源
-- 寄存器: ~2,000个
-- LUT: ~3,000个
+### 单Pipeline资源（LUT）
+- **MD5**: ~7,600 LUT
+- **SHA256**: ~11,400 LUT
+- **SHA1**: ~10,800 LUT
 
-### 16 Pipeline总资源
-- Pipeline核心: ~48,000 LUT, ~32,000寄存器
-- 调度器: ~5,000 LUT
-- 结果收集器: ~3,000 LUT
-- **总计**: ~56,000 LUT, ~32,000寄存器
+### 16 Pipeline总资源（LUT）
+- **16 × SHA256 Core**: ~123,456 LUT
+- **16 × Pipeline Core包装器**: ~16,240 LUT
+- **Scheduler**: ~1,433 LUT
+- **Result Collector**: ~15,256 LUT
+- **AXI Interface**: ~2,042 LUT（共享）
+- **Block Formatter**: ~1,266 LUT（共享）
+- **顶层**: ~802 LUT
+
+**16 Pipeline总计**: **~150,000 LUT**（优化后）
+
+**换算说明**: 1个寄存器(FF) ≈ 1.5 LUT（考虑时钟、复位、使能等控制逻辑）
 
 ## 性能测试
 

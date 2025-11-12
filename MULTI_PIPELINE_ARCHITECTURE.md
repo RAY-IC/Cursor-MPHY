@@ -119,19 +119,33 @@
 3. **Pipeline平衡**: 确保各pipeline负载均衡
 4. **资源优化**: 共享常数表和函数计算单元
 
-## 5. 资源估算
+## 5. 资源估算（全部换算为LUT）
 
-### 5.1 单Pipeline资源
-- 寄存器: ~2000个
-- LUT: ~3000个
+### 5.1 单Pipeline资源（LUT）
+- **MD5 Core**: ~3,886 LUT
+- **SHA256 Core**: ~7,716 LUT
+- **SHA1 Core**: ~7,046 LUT
+- **AXI Interface**: ~2,042 LUT
+- **Block Formatter**: ~1,266 LUT
+- **顶层**: ~402 LUT
 
-### 5.2 16 Pipeline资源
-- 寄存器: ~32,000个
-- LUT: ~48,000个
-- 调度器: ~5000 LUT
-- 结果收集器: ~3000 LUT
+**单Pipeline总计**:
+- MD5: ~7,600 LUT
+- SHA256: ~11,400 LUT
+- SHA1: ~10,800 LUT
 
-**总计**: ~56,000 LUT, ~32,000寄存器
+### 5.2 16 Pipeline资源（LUT）
+- **16 × SHA256 Core**: ~123,456 LUT
+- **16 × Pipeline Core包装器**: ~16,240 LUT
+- **Scheduler**: ~1,433 LUT
+- **Result Collector**: ~15,256 LUT
+- **AXI Interface**: ~2,042 LUT（共享）
+- **Block Formatter**: ~1,266 LUT（共享）
+- **顶层**: ~802 LUT
+
+**16 Pipeline总计**: **~150,000 LUT**（优化后）
+
+**换算说明**: 1个寄存器(FF) ≈ 1.5 LUT（考虑时钟、复位、使能等控制逻辑）
 
 ## 6. 时序设计
 
